@@ -1,3 +1,4 @@
+// src/store/authStore.ts
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
@@ -8,9 +9,11 @@ interface AuthState {
     id: string;
     name: string;
     belt: string;
+    isAdmin: boolean;
   } | null;
   isLoading: boolean;
-  signUp: (email: string, password: string, name: string, belt: string) => Promise<void>;
+  initialize: () => Promise<void>;
+  signUp: (email: string, password: string, name: string, belt: string, adminCode?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   loadProfile: () => Promise<void>;
@@ -21,13 +24,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   profile: null,
   isLoading: true,
 
-  signUp: async (email: string, password: string, name: string, belt: string) => {
+  initialize: async () => {
+    try {
+      set({ isLoading: true });
+      
+      // Check if there's a session
+      const { data } = await supabase.auth.getSession();
+      
+      if (data.session?.user) {
+        set({ user: data.session.user });
+        await get().loadProfile();
+      }
+    } catch (error) {
+      console.error('Error initializing auth:', error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  signUp: async (email: string, password: string, name: string, belt: string, adminCode?: string) => {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (authError) throw authError;
+
+    // Check if the admin code is correct
+    const isAdmin = adminCode === 'pitbullRoee2025';
 
     if (authData.user) {
       const { error: profileError } = await supabase
@@ -37,6 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             id: authData.user.id,
             name,
             belt,
+            is_admin: isAdmin,
           },
         ]);
 
@@ -48,6 +73,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           id: authData.user.id,
           name,
           belt,
+          isAdmin: isAdmin,
         }
       });
     }
@@ -87,6 +113,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           id: data.id,
           name: data.name,
           belt: data.belt,
+          isAdmin: data.is_admin || false,
         }
       });
     }
