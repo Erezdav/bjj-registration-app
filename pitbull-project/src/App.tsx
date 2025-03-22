@@ -1,7 +1,9 @@
+// src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { Calendar, Trophy, LogOut } from 'lucide-react';
+import { Calendar, Trophy, LogOut, Settings } from 'lucide-react';
 import WeeklySchedule from './components/WeeklySchedule';
 import EventsList from './components/EventsList';
+import AdminPanel from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { useAuthStore } from './store/authStore';
 
@@ -9,6 +11,9 @@ function App() {
   const [activeTab, setActiveTab] = useState('schedule');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const { user, profile, signOut } = useAuthStore();
+
+  // Check if user is admin 
+  const isAdmin = profile?.isAdmin === true;
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -46,6 +51,19 @@ function App() {
                   <Trophy className="w-4 h-4 mr-2" />
                   Events
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => setActiveTab('admin')}
+                    className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+                      activeTab === 'admin'
+                        ? 'bg-orange-500 text-white'
+                        : 'text-gray-700 hover:bg-orange-100'
+                    }`}
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Admin
+                  </button>
+                )}
               </nav>
               {user ? (
                 <div className="flex items-center space-x-4">
@@ -76,6 +94,7 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'schedule' && <WeeklySchedule />}
         {activeTab === 'events' && <EventsList />}
+        {activeTab === 'admin' && <AdminPanel />}
       </main>
 
       <AuthModal
