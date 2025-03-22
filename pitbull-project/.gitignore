@@ -22,5 +22,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-VITE_SUPABASE_URL=https://xvtwzbnjtatfeygltfac.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2dHd6Ym5qdGF0ZmV5Z2x0ZmFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI2MzA5MDYsImV4cCI6MjA1ODIwNjkwNn0.6sEHAUKrsQzHXIlVZ4YTT2TJmczNfXjfH7GyBD_29ak
+
