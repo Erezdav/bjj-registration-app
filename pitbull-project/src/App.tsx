@@ -12,6 +12,10 @@ function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const { user, profile, signOut } = useAuthStore();
 
+  useEffect(() => {
+  // Initialize auth state when the app loads
+  useAuthStore.getState().initialize();
+}, [])
   // Check if user is admin 
   const isAdmin = profile?.isAdmin === true;
 
