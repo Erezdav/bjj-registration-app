@@ -50,24 +50,20 @@ function WeeklySchedule() {
   }, [user]);
 
   async function fetchTrainings() {
+  try {
+    // Simpler query without joins
     const { data, error } = await supabase
       .from('trainings')
-      .select(`
-        *,
-        registrations (
-          user_id,
-          profiles (
-            name,
-            belt
-          )
-        )
-      `);
+      .select('*');
 
     if (error) {
-      console.error('Error fetching trainings:', error);
+      console.error('Error details:', error); // More detailed error logging
       return;
     }
 
+    console.log("Trainings data:", data); // Log successful data
+
+    // Format as needed...
     const formattedTrainings: Training[] = data.map((training) => ({
       id: training.id,
       title: training.title,
@@ -76,16 +72,14 @@ function WeeklySchedule() {
       level: training.level,
       maxParticipants: training.max_participants,
       dayOfWeek: training.day_of_week,
-      participants: training.registrations.map((reg: any) => ({
-        id: reg.user_id,
-        name: reg.profiles.name,
-        belt: reg.profiles.belt,
-      })),
+      participants: [], // Empty array for now
     }));
 
     setTrainings(formattedTrainings);
+  } catch (e) {
+    console.error('Exception in fetchTrainings:', e);
   }
-
+}
   async function fetchUserRegistrations() {
     const { data, error } = await supabase
       .from('registrations')
