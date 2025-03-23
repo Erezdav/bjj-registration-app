@@ -1,3 +1,4 @@
+// src/components/WeeklySchedule.tsx
 import React, { useState, useEffect } from 'react';
 import { Clock, Users, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -9,7 +10,7 @@ interface Training {
   id: string;
   title: string;
   startTime: string;
- 
+  endTime: string;
   level: string;
   maxParticipants: number;
   dayOfWeek: number;
@@ -49,90 +50,113 @@ function WeeklySchedule() {
     }
   }, [user]);
 
-   
- async function fetchTrainings() {
-  try {
-    // First get basic training data
-    const { data, error } = await supabase
-      .from('trainings')
-      .select('*')
-      .order('day_of_week')
-      .order('start_time');
+  async function fetchTrainings() {
+    try {
+      // Basic query to get all trainings
+      const { data, error } = await supabase
+        .from('trainings')
+        .select('*')
+        .order('day_of_week')
+        .order('start_time');
 
-    if (error) throw error;
+      if (error) {
+        console.error('Error fetching trainings:', error);
+        return;
+      }
 
-    // Format trainings
-    const formattedTrainings: Training[] = data.map((training) => ({
-      id: training.id,
-      title: training.title,
-      startTime: training.start_time,
-      endTime: training.end_time,
-      level: training.level,
-      maxParticipants: training.max_participants,
-      dayOfWeek: training.day_of_week,
-      participants: [], // Empty array to be filled later
-    }));
+      // Format the trainings data
+      const formattedTrainings: Training[] = data.map((training) => ({
+        id: training.id,
+        title: training.title,
+        startTime: training.start_time,
+        endTime: training.end_time,
+        level: training.level,
+        maxParticipants: training.max_participants,
+        dayOfWeek: training.day_of_week,
+        participants: [], // Will be populated separately
+      }));
 
-    setTrainings(formattedTrainings);
-    
-    // If user is logged in, fetch participants in a separate query
-    if (user) {
-      fetchParticipants();
-    }
-  } catch (error) {
-    console.error('Error fetching trainings:', error);
-  }
-}
-
-// Add a separate function to fetch participants
-async function fetchParticipants() {
-  try {
-    // Get registrations
-    const { data, error } = await supabase
-      .from('registrations')
-      .select(`
-        training_id,
-        profiles:user_id (id, name, belt)
-      `);
-
-    if (error) throw error;
-
-    if (data && data.length > 0) {
-      // Create a copy of current trainings
-      const updatedTrainings = [...trainings];
+      setTrainings(formattedTrainings);
       
-      // Update participants for each training
-      data.forEach(reg => {
-        if (reg.training_id && reg.profiles) {
+      // Only try to fetch participants if there are trainings
+      if (formattedTrainings.length > 0) {
+        fetchTrainingParticipants();
+      }
+    } catch (e) {
+      console.error('Exception in fetchTrainings:', e);
+    }
+  }
+
+  async function fetchTrainingParticipants() {
+    try {
+      // Get all registrations
+      const { data, error } = await supabase
+        .from('registrations')
+        .select('training_id, user_id');
+
+      if (error) {
+        console.error('Error fetching registrations:', error);
+        return;
+      }
+
+      // Get all users who have registrations
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(reg => reg.user_id))];
+        
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, name, belt')
+          .in('id', userIds);
+          
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          return;
+        }
+        
+        // Create a map of user profiles
+        const profilesMap = new Map();
+        profilesData?.forEach(profile => {
+          profilesMap.set(profile.id, profile);
+        });
+        
+        // Update trainings with participants
+        const updatedTrainings = [...trainings];
+        data.forEach(reg => {
           const trainingIndex = updatedTrainings.findIndex(t => t.id === reg.training_id);
-          if (trainingIndex !== -1) {
+          const userProfile = profilesMap.get(reg.user_id);
+          
+          if (trainingIndex !== -1 && userProfile) {
             updatedTrainings[trainingIndex].participants.push({
-              id: reg.profiles.id,
-              name: reg.profiles.name,
-              belt: reg.profiles.belt
+              id: userProfile.id,
+              name: userProfile.name,
+              belt: userProfile.belt
             });
           }
-        }
-      });
-      
-      setTrainings(updatedTrainings);
+        });
+        
+        setTrainings(updatedTrainings);
+      }
+    } catch (e) {
+      console.error('Exception in fetchTrainingParticipants:', e);
     }
-  } catch (error) {
-    console.error('Error fetching participants:', error);
   }
-}
+
   async function fetchUserRegistrations() {
-    const { data, error } = await supabase
-      .from('registrations')
-      .select('training_id')
-      .eq('user_id', user!.id);
+    try {
+      const { data, error } = await supabase
+        .from('registrations')
+        .select('training_id')
+        .eq('user_id', user!.id);
 
-    if (error) {
-      console.error('Error fetching user registrations:', error);
-      return;
+      if (error) {
+        console.error('Error fetching user registrations:', error);
+        return;
+      }
+
+      setRegistrations(new Set(data.map((reg) => reg.training_id)));
+    } catch (e) {
+      console.error('Exception in fetchUserRegistrations:', e);
     }
-
-    setRegistrations(new Set(data.map((reg) => reg.training_id)));
   }
 
   async function handleRegistration(trainingId: string) {
@@ -173,7 +197,8 @@ async function fetchParticipants() {
         });
       }
 
-      await fetchTrainings();
+      // Refresh training data
+      fetchTrainings();
     } catch (error) {
       console.error('Error updating registration:', error);
       alert('Failed to update registration');
@@ -201,63 +226,3 @@ async function fetchParticipants() {
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="text-lg font-medium text-gray-900">
-                            {class_.title}
-                          </h4>
-                          <div className="flex items-center mt-2 text-gray-600">
-                            <Clock className="w-4 h-4 mr-1" />
-                            <span>
-                              {class_.startTime} - {class_.endTime}
-                            </span>
-                          </div>
-                          <div className="flex items-center mt-1 text-gray-600">
-                            <Users className="w-4 h-4 mr-1" />
-                            <span>{class_.participants.length} / {class_.maxParticipants} spots</span>
-                          </div>
-                        </div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                          {class_.level}
-                        </span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center mt-4">
-                        <button 
-                          onClick={() => setSelectedClass(selectedClass === class_.id ? null : class_.id)}
-                          className="text-orange-600 hover:text-orange-700 text-sm font-medium"
-                        >
-                          {selectedClass === class_.id ? 'Hide Participants' : 'Show Participants'}
-                        </button>
-                        {user && (
-                          <button
-                            onClick={() => handleRegistration(class_.id)}
-                            className={`py-2 px-4 rounded-md transition-colors ${
-                              registrations.has(class_.id)
-                                ? 'bg-red-500 hover:bg-red-600 text-white'
-                                : 'bg-orange-500 hover:bg-orange-600 text-white'
-                            }`}
-                            disabled={!registrations.has(class_.id) && class_.participants.length >= class_.maxParticipants}
-                          >
-                            {registrations.has(class_.id) ? 'Cancel' : 'Register'}
-                          </button>
-                        )}
-                      </div>
-
-                      {selectedClass === class_.id && (
-                        <ParticipantsList participants={class_.participants} />
-                      )}
-                    </div>
-                  ))}
-                {trainings.filter((class_) => class_.dayOfWeek === index).length === 0 && (
-                  <div className="text-center py-4 text-gray-500">
-                    No classes scheduled
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default WeeklySchedule;
