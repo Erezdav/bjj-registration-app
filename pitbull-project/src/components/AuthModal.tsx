@@ -2,7 +2,23 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { Eye, EyeOff } from 'lucide-react';
+// In AuthModal.tsx
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
 
+  try {
+    if (isSignUp) {
+      await signUp(email, password, name, belt, adminCode);
+    } else {
+      await signIn(email, password);
+    }
+    onClose();
+  } catch (err) {
+    console.error('Authentication error:', err);
+    setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+  }
+};
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
