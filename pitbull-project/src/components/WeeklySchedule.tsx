@@ -9,7 +9,7 @@ interface Training {
   id: string;
   title: string;
   startTime: string;
-  endTime: string;
+ 
   level: string;
   maxParticipants: number;
   dayOfWeek: number;
