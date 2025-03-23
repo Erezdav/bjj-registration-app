@@ -133,6 +133,13 @@ function WeeklySchedule() {
             belt: userProfile.belt
           });
         }
+        } else {
+      console.log('No registrations found');
+    }
+  } catch (e) {
+    console.error('Exception in fetchTrainingParticipants:', e);
+  }
+}
       });
       
       setTrainings(updatedTrainings);
