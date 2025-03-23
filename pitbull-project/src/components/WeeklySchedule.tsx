@@ -80,17 +80,24 @@ function WeeklySchedule() {
   }
 }
 
-   async function fetchTrainingParticipants() {
+ async function fetchTrainingParticipants() {
+  console.log('Starting fetchTrainingParticipants');
   try {
     // Get all registrations
+    console.log('Fetching registrations...');
     const { data, error } = await supabase
       .from('registrations')
-      .select('training_id, user_id');
+      .select('*');
+
+    console.log('Registrations result:', { data, error });
 
     if (error) {
       console.error('Error fetching registrations:', error);
       return;
     }
+
+    if (data && data.length > 0) {
+      console.log('Processing registrations data...');
 
     // Get all users who have registrations
     if (data && data.length > 0) {
