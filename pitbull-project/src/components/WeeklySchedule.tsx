@@ -159,36 +159,35 @@ function WeeklySchedule() {
     }
   }
 
-  async function handleRegistration(trainingId: string) {
-    if (!user || !profile) {
-      alert('Please sign in to register for classes');
-      return;
-    }
+async function handleRegistration(trainingId: string) {
+  if (!user || !profile) {
+    alert('Please sign in to register for classes');
+    return;
+  }
 
-    const isRegistered = registrations.has(trainingId);
+  const isRegistered = registrations.has(trainingId);
 
-    try {
-      if (isRegistered) {
-        await supabase
-          .from('registrations')
-          .delete()
-          .eq('training_id', trainingId)
-          .eq('user_id', user.id);
-
+  try {
+    if (isRegistered) {
+      await supabase
+        .from('registrations')
+        .delete()
+        .eq('training_id', trainingId)
+        .eq('user_id', profile.id);
         setRegistrations((prev) => {
           const next = new Set(prev);
           next.delete(trainingId);
           return next;
         });
       } else {
-        await supabase
-          .from('registrations')
-          .insert([
-            {
-              training_id: trainingId,
-              user_id: user.id,
-            },
-          ]);
+      await supabase
+        .from('registrations')
+        .insert([
+          {
+            training_id: trainingId,
+            user_id: profile.id,  // Use profile.id (bigint), not user.id (UUID)
+          },
+        ]);
 
         setRegistrations((prev) => {
           const next = new Set(prev);
