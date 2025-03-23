@@ -42,7 +42,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signUp: async (email: string, password: string, name: string, belt: string, adminCode?: string) => {
+ 
+signUp: async (email: string, password: string, name: string, belt: string, adminCode?: string) => {
+  try {
+    // Check if the admin code is correct
+    const isAdmin = adminCode === 'pitbullRoee2025';
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -50,15 +55,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (authError) throw authError;
 
-    // Check if the admin code is correct
-    const isAdmin = adminCode === 'pitbullRoee2025';
-
     if (authData.user) {
+      // The critical part - create a profile with a BIGINT id
+      // Since Supabase auth uses UUID, we need a different approach
+      
+      // Option 1: Generate a numeric ID for the profile
+      // Get the highest current id in profiles table
+      const { data: maxIdData } = await supabase
+        .from('profiles')
+        .select('id')
+        .order('id', { ascending: false })
+        .limit(1);
+      
+      // Calculate new ID
+      const newId = maxIdData && maxIdData.length > 0 
+        ? Number(maxIdData[0].id) + 1 
+        : 1;
+      
+      // Insert the profile with the new numeric ID
       const { error: profileError } = await supabase
         .from('profiles')
         .insert([
           {
-            id: authData.user.id,
+            id: newId,  // Use a numeric ID
+            email: email,  // Store the email for reference
             name,
             belt,
             is_admin: isAdmin,
@@ -70,43 +90,73 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ 
         user: authData.user,
         profile: {
-          id: authData.user.id,
+          id: newId,  // Use the numeric ID
           name,
           belt,
           isAdmin: isAdmin,
         }
       });
     }
-  },
-
+  } catch (error) {
+    console.error('Sign up error:', error);
+    throw error;
+  }
+}
   signIn: async (email: string, password: string) => {
+  try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
-    set({ user: data.user });
-    await get().loadProfile();
-  },
+    
+    // Find the profile by email
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name, belt, is_admin')
+      .eq('email', email)
+      .single();
 
+    if (profileError) {
+      console.error('Error finding profile:', profileError);
+      throw new Error('Could not find user profile. Please try again.');
+    }
+
+    set({ 
+      user: data.user, 
+      profile: {
+        id: profileData.id,  // This is the numeric ID
+        name: profileData.name,
+        belt: profileData.belt,
+        isAdmin: profileData.is_admin || false,
+      }
+    });
+  } catch (error) {
+    console.error('Sign in error:', error);
+    throw error;
+  }
+}
   signOut: async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     set({ user: null, profile: null });
   },
 
-  loadProfile: async () => {
-    const { user } = get();
-    if (!user) return;
+ loadProfile: async () => {
+  const { user } = get();
+  if (!user) return;
 
+  try {
+    // Find the profile by email
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('email', user.email)
       .single();
 
     if (error) throw error;
+    
     if (data) {
       set({ 
         profile: {
@@ -117,5 +167,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       });
     }
+  } catch (error) {
+    console.error('Error loading profile:', error);
+  }
+}
   },
 }));
