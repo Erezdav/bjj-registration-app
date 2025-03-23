@@ -87,52 +87,60 @@ function WeeklySchedule() {
     }
   }
 
-  async function fetchTrainingParticipants() {
-    try {
-      // Get all registrations
-      const { data, error } = await supabase
-        .from('registrations')
-        .select('training_id, user_id');
+   async function fetchTrainingParticipants() {
+  try {
+    // Get all registrations
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('training_id, user_id');
 
-      if (error) {
-        console.error('Error fetching registrations:', error);
+    if (error) {
+      console.error('Error fetching registrations:', error);
+      return;
+    }
+
+    // Get all users who have registrations
+    if (data && data.length > 0) {
+      // ה-user_id הוא כעת מסוג bigint, לא uuid
+      const userIds = [...new Set(data.map(reg => reg.user_id))];
+      
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, name, belt')
+        .in('id', userIds);  // כאן id של profiles הוא bigint, תואם ל-user_id ברישומים
+          
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
         return;
       }
-
-      // Get all users who have registrations
-      if (data && data.length > 0) {
-        const userIds = [...new Set(data.map(reg => reg.user_id))];
+      
+      // יצירת מפה של פרופילי משתמשים
+      const profilesMap = new Map();
+      profilesData?.forEach(profile => {
+        profilesMap.set(profile.id, profile);  // השתמש ב-id שהוא bigint
+      });
+      
+      // עדכון האימונים עם המשתתפים
+      const updatedTrainings = [...trainings];
+      data.forEach(reg => {
+        const trainingIndex = updatedTrainings.findIndex(t => t.id === reg.training_id);
+        const userProfile = profilesMap.get(reg.user_id);
         
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, name, belt')
-          .in('id', userIds);
-          
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-          return;
+        if (trainingIndex !== -1 && userProfile) {
+          updatedTrainings[trainingIndex].participants.push({
+            id: userProfile.id.toString(),  // המר את ה-bigint למחרוזת לשימוש בממשק המשתמש
+            name: userProfile.name,
+            belt: userProfile.belt
+          });
         }
-        
-        // Create a map of user profiles
-        const profilesMap = new Map();
-        profilesData?.forEach(profile => {
-          profilesMap.set(profile.id, profile);
-        });
-        
-        // Update trainings with participants
-        const updatedTrainings = [...trainings];
-        data.forEach(reg => {
-          const trainingIndex = updatedTrainings.findIndex(t => t.id === reg.training_id);
-          const userProfile = profilesMap.get(reg.user_id);
-          
-          if (trainingIndex !== -1 && userProfile) {
-            updatedTrainings[trainingIndex].participants.push({
-              id: userProfile.id,
-              name: userProfile.name,
-              belt: userProfile.belt
-            });
-          }
-        });
+      });
+      
+      setTrainings(updatedTrainings);
+    }
+  } catch (e) {
+    console.error('Exception in fetchTrainingParticipants:', e);
+  }
+}     });
         
         setTrainings(updatedTrainings);
       }
