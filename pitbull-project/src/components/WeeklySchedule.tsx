@@ -1,4 +1,4 @@
-// src/components/WeeklySchedule.tsx
+// WeeklySchedule.tsx - simplified version
 import React, { useState, useEffect } from 'react';
 import { Clock, Users, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -6,237 +6,70 @@ import { useAuthStore } from '../store/authStore';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-interface Training {
-  id: string;
-  title: string;
-  startTime: string;
-  endTime: string;
-  level: string;
-  maxParticipants: number;
-  dayOfWeek: number;
-  participants: Array<{
-    id: string;
-    name: string;
-    belt: string;
-  }>;
-}
-
-function ParticipantsList({ participants }: { participants: Training['participants'] }) {
-  return (
-    <div className="mt-4 space-y-2">
-      {participants.map((participant) => (
-        <div key={participant.id} className="flex items-center justify-between bg-orange-50 p-2 rounded-md">
-          <span className="text-gray-900">{participant.name}</span>
-          <div className="flex items-center text-gray-600">
-            <Shield className="w-4 h-4 mr-1" />
-            <span>{participant.belt}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function WeeklySchedule() {
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
-  const [trainings, setTrainings] = useState<Training[]>([]);
-  const [registrations, setRegistrations] = useState<Set<string>>(new Set());
+  const [trainings, setTrainings] = useState([]);
+  const [registrations, setRegistrations] = useState(new Set());
   const { user, profile } = useAuthStore();
 
   useEffect(() => {
     fetchTrainings();
-    if (user) {
+    if (user && profile) {
       fetchUserRegistrations();
     }
-  }, [user]);
+  }, [user, profile]);
 
-   async function fetchTrainings() {
-  try {
-    // Just get trainings without participants for now
-    const { data, error } = await supabase
-      .from('trainings')
-      .select('*');
+  async function fetchTrainings() {
+    try {
+      console.log('Fetching trainings...');
+      const { data, error } = await supabase
+        .from('trainings')
+        .select('*');
 
-    if (error) {
-      console.error('Error fetching trainings:', error);
-      return;
-    }
+      console.log('Trainings result:', { data, error });
 
-    // Format without participants
-    const formattedTrainings: Training[] = data.map((training) => ({
-      id: training.id,
-      title: training.title,
-      startTime: training.start_time,
-      endTime: training.end_time || '',
-      level: training.level || 'All Levels',
-      maxParticipants: training.max_participants || 10,
-      dayOfWeek: training.day_of_week || 0,
-      participants: [], // Empty array
-    }));
-
-    setTrainings(formattedTrainings);
-  } catch (e) {
-    console.error('Exception in fetchTrainings:', e);
-  }
-}
-
- async function fetchTrainingParticipants() {
-  console.log('Starting fetchTrainingParticipants');
-  try {
-    // Get all registrations
-    console.log('Fetching registrations...');
-    const { data, error } = await supabase
-      .from('registrations')
-      .select('*');
-
-    console.log('Registrations result:', { data, error });
-
-    if (error) {
-      console.error('Error fetching registrations:', error);
-      return;
-    }
-
-    if (data && data.length > 0) {
-      console.log('Processing registrations data...');
-
-    // Get all users who have registrations
-    if (data && data.length > 0) {
-      // ה-user_id הוא כעת מסוג bigint, לא uuid
-      const userIds = [...new Set(data.map(reg => reg.user_id))];
-      
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, name, belt')
-        .in('id', userIds);  // כאן id של profiles הוא bigint, תואם ל-user_id ברישומים
-          
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
+      if (error) {
+        console.error('Error fetching trainings:', error);
         return;
       }
-      
-      // יצירת מפה של פרופילי משתמשים
-      const profilesMap = new Map();
-      profilesData?.forEach(profile => {
-        profilesMap.set(profile.id, profile);  // השתמש ב-id שהוא bigint
-      });
-      
-      // עדכון האימונים עם המשתתפים
-      const updatedTrainings = [...trainings];
-      data.forEach(reg => {
-        const trainingIndex = updatedTrainings.findIndex(t => t.id === reg.training_id);
-        const userProfile = profilesMap.get(reg.user_id);
-        
-        if (trainingIndex !== -1 && userProfile) {
-          updatedTrainings[trainingIndex].participants.push({
-            id: userProfile.id.toString(),  // המר את ה-bigint למחרוזת לשימוש בממשק המשתמש
-            name: userProfile.name,
-            belt: userProfile.belt
-          });
-        }
-        } else {
-      console.log('No registrations found');
-    }
-  } catch (e) {
-    console.error('Exception in fetchTrainingParticipants:', e);
-  }
-}
-      });
-      
-      setTrainings(updatedTrainings);
-    }
-  } catch (e) {
-    console.error('Exception in fetchTrainingParticipants:', e);
-  }
-}     });
-        
-        setTrainings(updatedTrainings);
-      }
+
+      // Format trainings without participants for now
+      const formattedTrainings = data.map(training => ({
+        id: training.id,
+        title: training.title || 'Untitled',
+        startTime: training.start_time || '00:00',
+        endTime: training.end_time || '00:00',
+        level: training.level || 'All Levels',
+        maxParticipants: training.max_participants || 10,
+        dayOfWeek: training.day_of_week || 0,
+        participants: [] // Empty for now
+      }));
+
+      setTrainings(formattedTrainings);
     } catch (e) {
-      console.error('Exception in fetchTrainingParticipants:', e);
+      console.error('Exception in fetchTrainings:', e);
     }
   }
 
   async function fetchUserRegistrations() {
     try {
+      console.log('Fetching user registrations...');
       const { data, error } = await supabase
         .from('registrations')
         .select('training_id')
-        .eq('user_id', user!.id);
+        .eq('user_id', profile.id); // Using profile.id (bigint)
+
+      console.log('User registrations result:', { data, error });
 
       if (error) {
         console.error('Error fetching user registrations:', error);
         return;
       }
 
-      setRegistrations(new Set(data.map((reg) => reg.training_id)));
+      setRegistrations(new Set(data.map(reg => reg.training_id)));
     } catch (e) {
       console.error('Exception in fetchUserRegistrations:', e);
     }
   }
 
-async function handleRegistration(trainingId: string) {
-  if (!user || !profile) {
-    alert('Please sign in to register for classes');
-    return;
-  }
-
-  const isRegistered = registrations.has(trainingId);
-
-  try {
-    if (isRegistered) {
-      await supabase
-        .from('registrations')
-        .delete()
-        .eq('training_id', trainingId)
-        .eq('user_id', profile.id);
-        setRegistrations((prev) => {
-          const next = new Set(prev);
-          next.delete(trainingId);
-          return next;
-        });
-      } else {
-      await supabase
-        .from('registrations')
-        .insert([
-          {
-            training_id: trainingId,
-            user_id: profile.id,  // Use profile.id (bigint), not user.id (UUID)
-          },
-        ]);
-
-        setRegistrations((prev) => {
-          const next = new Set(prev);
-          next.add(trainingId);
-          return next;
-        });
-      }
-
-      // Refresh training data
-      fetchTrainings();
-    } catch (error) {
-      console.error('Error updating registration:', error);
-      alert('Failed to update registration');
-    }
-  }
-
-  return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Weekly Schedule</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {DAYS.map((day, index) => (
-            <div key={day} className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                {day}
-              </h3>
-              <div className="space-y-4">
-                {trainings
-                  .filter((class_) => class_.dayOfWeek === index)
-                  .map((class_) => (
-                    <div
-                      key={class_.id}
-                      className="bg-white rounded-lg p-4 border border-orange-200 shadow-sm"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="text-lg font-medium text-gray-900">
+  // Rest of your component...
+}
