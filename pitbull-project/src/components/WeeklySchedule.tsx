@@ -50,42 +50,35 @@ function WeeklySchedule() {
     }
   }, [user]);
 
-  async function fetchTrainings() {
-    try {
-      // Basic query to get all trainings
-      const { data, error } = await supabase
-        .from('trainings')
-        .select('*')
-        .order('day_of_week')
-        .order('start_time');
+   async function fetchTrainings() {
+  try {
+    // Just get trainings without participants for now
+    const { data, error } = await supabase
+      .from('trainings')
+      .select('*');
 
-      if (error) {
-        console.error('Error fetching trainings:', error);
-        return;
-      }
-
-      // Format the trainings data
-      const formattedTrainings: Training[] = data.map((training) => ({
-        id: training.id,
-        title: training.title,
-        startTime: training.start_time,
-        endTime: training.end_time,
-        level: training.level,
-        maxParticipants: training.max_participants,
-        dayOfWeek: training.day_of_week,
-        participants: [], // Will be populated separately
-      }));
-
-      setTrainings(formattedTrainings);
-      
-      // Only try to fetch participants if there are trainings
-      if (formattedTrainings.length > 0) {
-        fetchTrainingParticipants();
-      }
-    } catch (e) {
-      console.error('Exception in fetchTrainings:', e);
+    if (error) {
+      console.error('Error fetching trainings:', error);
+      return;
     }
+
+    // Format without participants
+    const formattedTrainings: Training[] = data.map((training) => ({
+      id: training.id,
+      title: training.title,
+      startTime: training.start_time,
+      endTime: training.end_time || '',
+      level: training.level || 'All Levels',
+      maxParticipants: training.max_participants || 10,
+      dayOfWeek: training.day_of_week || 0,
+      participants: [], // Empty array
+    }));
+
+    setTrainings(formattedTrainings);
+  } catch (e) {
+    console.error('Exception in fetchTrainings:', e);
   }
+}
 
    async function fetchTrainingParticipants() {
   try {
