@@ -49,22 +49,19 @@ function WeeklySchedule() {
     }
   }, [user]);
 
-  async function fetchTrainings() {
+   async function fetchTrainings() {
   try {
-    // Simpler query without joins
-    const { data, error } = await supabase
+    // First get all trainings
+    const { data: trainingsData, error: trainingsError } = await supabase
       .from('trainings')
-      .select('*');
+      .select('*')
+      .order('day_of_week')
+      .order('start_time');
 
-    if (error) {
-      console.error('Error details:', error); // More detailed error logging
-      return;
-    }
+    if (trainingsError) throw trainingsError;
 
-    console.log("Trainings data:", data); // Log successful data
-
-    // Format as needed...
-    const formattedTrainings: Training[] = data.map((training) => ({
+    // Format trainings
+    const formattedTrainings: Training[] = trainingsData.map((training) => ({
       id: training.id,
       title: training.title,
       startTime: training.start_time,
@@ -72,12 +69,37 @@ function WeeklySchedule() {
       level: training.level,
       maxParticipants: training.max_participants,
       dayOfWeek: training.day_of_week,
-      participants: [], // Empty array for now
+      participants: [],
     }));
 
+    // Get registrations with user profiles for all trainings
+    const { data: registrationsData, error: registrationsError } = await supabase
+      .from('registrations')
+      .select(`
+        training_id,
+        profiles:user_id (id, name, belt)
+      `)
+      .in('training_id', formattedTrainings.map(t => t.id));
+
+    if (registrationsError) throw registrationsError;
+
+    // Add participants to each training
+    if (registrationsData) {
+      for (const reg of registrationsData) {
+        const training = formattedTrainings.find(t => t.id === reg.training_id);
+        if (training && reg.profiles) {
+          training.participants.push({
+            id: reg.profiles.id,
+            name: reg.profiles.name,
+            belt: reg.profiles.belt
+          });
+        }
+      }
+    }
+
     setTrainings(formattedTrainings);
-  } catch (e) {
-    console.error('Exception in fetchTrainings:', e);
+  } catch (error) {
+    console.error('Error fetching trainings:', error);
   }
 }
   async function fetchUserRegistrations() {
