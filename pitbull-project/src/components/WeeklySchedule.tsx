@@ -49,19 +49,20 @@ function WeeklySchedule() {
     }
   }, [user]);
 
-   async function fetchTrainings() {
+   
+ async function fetchTrainings() {
   try {
-    // First get all trainings
-    const { data: trainingsData, error: trainingsError } = await supabase
+    // First get basic training data
+    const { data, error } = await supabase
       .from('trainings')
       .select('*')
       .order('day_of_week')
       .order('start_time');
 
-    if (trainingsError) throw trainingsError;
+    if (error) throw error;
 
     // Format trainings
-    const formattedTrainings: Training[] = trainingsData.map((training) => ({
+    const formattedTrainings: Training[] = data.map((training) => ({
       id: training.id,
       title: training.title,
       startTime: training.start_time,
@@ -69,37 +70,55 @@ function WeeklySchedule() {
       level: training.level,
       maxParticipants: training.max_participants,
       dayOfWeek: training.day_of_week,
-      participants: [],
+      participants: [], // Empty array to be filled later
     }));
 
-    // Get registrations with user profiles for all trainings
-    const { data: registrationsData, error: registrationsError } = await supabase
+    setTrainings(formattedTrainings);
+    
+    // If user is logged in, fetch participants in a separate query
+    if (user) {
+      fetchParticipants();
+    }
+  } catch (error) {
+    console.error('Error fetching trainings:', error);
+  }
+}
+
+// Add a separate function to fetch participants
+async function fetchParticipants() {
+  try {
+    // Get registrations
+    const { data, error } = await supabase
       .from('registrations')
       .select(`
         training_id,
         profiles:user_id (id, name, belt)
-      `)
-      .in('training_id', formattedTrainings.map(t => t.id));
+      `);
 
-    if (registrationsError) throw registrationsError;
+    if (error) throw error;
 
-    // Add participants to each training
-    if (registrationsData) {
-      for (const reg of registrationsData) {
-        const training = formattedTrainings.find(t => t.id === reg.training_id);
-        if (training && reg.profiles) {
-          training.participants.push({
-            id: reg.profiles.id,
-            name: reg.profiles.name,
-            belt: reg.profiles.belt
-          });
+    if (data && data.length > 0) {
+      // Create a copy of current trainings
+      const updatedTrainings = [...trainings];
+      
+      // Update participants for each training
+      data.forEach(reg => {
+        if (reg.training_id && reg.profiles) {
+          const trainingIndex = updatedTrainings.findIndex(t => t.id === reg.training_id);
+          if (trainingIndex !== -1) {
+            updatedTrainings[trainingIndex].participants.push({
+              id: reg.profiles.id,
+              name: reg.profiles.name,
+              belt: reg.profiles.belt
+            });
+          }
         }
-      }
+      });
+      
+      setTrainings(updatedTrainings);
     }
-
-    setTrainings(formattedTrainings);
   } catch (error) {
-    console.error('Error fetching trainings:', error);
+    console.error('Error fetching participants:', error);
   }
 }
   async function fetchUserRegistrations() {
