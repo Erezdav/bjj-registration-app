@@ -107,3 +107,7 @@ CREATE POLICY "Users can delete own registrations"
   ON registrations FOR DELETE
   TO authenticated
   USING (auth.uid() = user_id);
+
+// In supabase.ts
+console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+console.log('Anon Key available:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
